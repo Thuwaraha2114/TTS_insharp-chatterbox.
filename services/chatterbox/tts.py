@@ -126,38 +126,43 @@ class ChatterboxTTS:
         self.watermarker = perth.PerthImplicitWatermarker()
 
     @classmethod
-    
     def from_local(cls, ckpt_dir, device) -> 'ChatterboxTTS':
         ckpt_dir = Path(ckpt_dir)
 
+        # Always load to CPU first for non-CUDA devices to handle CUDA-saved models
         if device in ["cpu", "mps"]:
-            map_location = torch.device("cpu")
+            map_location = torch.device('cpu')
         else:
-            map_location = torch.device(device)
+            map_location = None
 
         ve = VoiceEncoder()
-        ve.load_state_dict(torch.load(ckpt_dir / "ve.pt", map_location=map_location))
+        ve.load_state_dict(
+            load_file(ckpt_dir / "ve.safetensors")
+        )
         ve.to(device).eval()
 
         t3 = T3()
-        t3_state = torch.load(ckpt_dir / "t3_cfg.pt", map_location=map_location)  # <- FIXED
+        t3_state = load_file(ckpt_dir / "t3_cfg.safetensors")
         if "model" in t3_state.keys():
             t3_state = t3_state["model"][0]
         t3.load_state_dict(t3_state)
         t3.to(device).eval()
 
         s3gen = S3Gen()
-        s3gen.load_state_dict(torch.load(ckpt_dir / "s3gen.pt", map_location=map_location), strict=False)
+        s3gen.load_state_dict(
+            load_file(ckpt_dir / "s3gen.safetensors"), strict=False
+        )
         s3gen.to(device).eval()
 
-        tokenizer = EnTokenizer(str(ckpt_dir / "tokenizer.json"))
+        tokenizer = EnTokenizer(
+            str(ckpt_dir / "tokenizer.json")
+        )
 
         conds = None
         if (builtin_voice := ckpt_dir / "conds.pt").exists():
             conds = Conditionals.load(builtin_voice, map_location=map_location).to(device)
 
         return cls(t3, s3gen, ve, tokenizer, device, conds=conds)
-
 
     @classmethod
     def from_pretrained(cls, device) -> 'ChatterboxTTS':
@@ -247,6 +252,9 @@ class ChatterboxTTS:
 
             # TODO: output becomes 1D
             speech_tokens = drop_invalid_tokens(speech_tokens)
+            
+            speech_tokens = speech_tokens[speech_tokens < 6561]
+
             speech_tokens = speech_tokens.to(self.device)
 
             wav, _ = self.s3gen.inference(

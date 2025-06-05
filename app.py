@@ -14,7 +14,6 @@ app = FastAPI()
 
 # Load model once during startup
 base_dir = Path(__file__).resolve().parent
-model_dir = base_dir / "services" / "chatter_box_model"
 audio_prompt_path = base_dir / "services" / "thuwa.wav"
 
 # Load model only once ✅
