@@ -1,0 +1,4 @@
+chatterbox_tts==0.1.1
+perth==1.0.0
+fastapi==0.115.12
+uvicorn==0.34.3
